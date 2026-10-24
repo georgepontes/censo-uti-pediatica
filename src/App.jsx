@@ -113,6 +113,18 @@ const RELIGION_OPTIONS = [
   "Não informado"
 ];
 
+// Opções clicáveis de onde a família está hospedada/acolhida em Belém durante a internação
+const BELEN_STAY_OPTIONS = [
+  "Residência Própria (Belém / Ananindeua / RMB)",
+  "Casa de Apoio / Abrigo Institucional",
+  "Casa de Familiares em Belém",
+  "Casa de Amigos / Conhecidos",
+  "Hotel / Pensão / Pousada / Aluguel Temporário",
+  "Permanência Integral no Hospital (Sem local externo)",
+  "Outro Local em Belém",
+  "Não informado"
+];
+
 // Lista de chaves de versões anteriores para resgate e migração automática
 const LEGACY_PATIENT_KEYS = [
   'uti_ped_patients_permanent',
@@ -255,6 +267,12 @@ function getWhatsAppLink(phone) {
   return `https://wa.me/${fullNumber}`;
 }
 
+function getGoogleMapsLink(address) {
+  if (!address || !String(address).trim()) return null;
+  const query = encodeURIComponent(`${String(address).trim()}, Belém - PA`);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
 function calculateAgeFromBirthDate(birthDateStr) {
   if (!birthDateStr) return '';
   const parts = birthDateStr.split('-');
@@ -308,6 +326,8 @@ const SEED_PATIENTS = [
     naturalness: "Santarém - PA",
     originCity: "Santarém",
     originState: "PA",
+    familyStayType: "Casa de Apoio / Abrigo Institucional",
+    familyStayAddress: "Casa Ronald McDonald / Casa de Apoio no bairro São Brás, Belém - PA",
     cardiacDiagnosis: "Pós-operatório tardio de CIV ampla e Coarctação de Aorta",
     admissionDate: "2026-10-18",
     status: "Internado",
@@ -474,6 +494,8 @@ function normalizePatientRecord(p) {
     naturalness: p.naturalness || '',
     originCity: p.originCity || '',
     originState: p.originState || 'PA',
+    familyStayType: p.familyStayType || 'Não informado',
+    familyStayAddress: p.familyStayAddress || '',
     cardiacDiagnosis: p.cardiacDiagnosis || '',
     admissionDate,
     status: p.status || 'Internado',
@@ -693,6 +715,8 @@ export default function App() {
     naturalness: '',
     originCity: '',
     originState: 'PA',
+    familyStayType: 'Não informado',
+    familyStayAddress: '',
     cardiacDiagnosis: '',
     admissionDate: currentBelemToday,
     currentCompanion: 'Mãe',
@@ -1172,6 +1196,8 @@ export default function App() {
         (patient.childName || '').toLowerCase().includes(term) ||
         (patient.bed || '').toLowerCase().includes(term) ||
         (patient.originCity || '').toLowerCase().includes(term) ||
+        (patient.familyStayType || '').toLowerCase().includes(term) ||
+        (patient.familyStayAddress || '').toLowerCase().includes(term) ||
         (patient.mother?.name || '').toLowerCase().includes(term) ||
         (patient.father?.name || '').toLowerCase().includes(term) ||
         (patient.companionName || '').toLowerCase().includes(term) ||
@@ -1275,6 +1301,8 @@ export default function App() {
         naturalness: norm.naturalness || '',
         originCity: norm.originCity,
         originState: norm.originState || 'PA',
+        familyStayType: norm.familyStayType || 'Não informado',
+        familyStayAddress: norm.familyStayAddress || '',
         cardiacDiagnosis: norm.cardiacDiagnosis,
         admissionDate: norm.admissionDate,
         currentCompanion: norm.currentCompanion || 'Mãe',
@@ -1745,6 +1773,11 @@ export default function App() {
                           <h3 className="text-sm font-bold text-white truncate">{p.childName}</h3>
                           <p className="text-[11px] text-zinc-400">{p.childAgeText || 'Idade N/I'} {p.childBirthDate ? `• Nasc: ${formatDateBr(p.childBirthDate)}` : ''}</p>
                           <p className="text-[11px] text-zinc-400 truncate">📍 Origem: {p.originCity || 'N/I'}-{p.originState || 'PA'}</p>
+                          {p.familyStayType && p.familyStayType !== 'Não informado' && (
+                            <p className="text-[10px] text-amber-300 truncate" title={p.familyStayAddress ? `${p.familyStayType} — ${p.familyStayAddress}` : p.familyStayType}>
+                              🏠 Em Belém: {p.familyStayType}
+                            </p>
+                          )}
                         </div>
 
                         <div className="p-2 rounded-xl bg-zinc-950/70 border border-zinc-800">
@@ -1822,6 +1855,7 @@ export default function App() {
                   const motherWa = getWhatsAppLink(patient.mother?.phone);
                   const fatherWa = getWhatsAppLink(patient.father?.phone);
                   const companionWa = getWhatsAppLink(patient.companionPhone);
+                  const stayMapsLink = getGoogleMapsLink(patient.familyStayAddress);
 
                   return (
                     <div key={patient.id} className={`rounded-2xl border p-5 flex flex-col justify-between transition-all ${isDischarged ? 'bg-zinc-900/40 border-zinc-800 opacity-85' : isIso ? 'bg-purple-950/20 border-purple-500/40' : 'bg-zinc-900/80 border-zinc-800'}`}>
@@ -1839,6 +1873,32 @@ export default function App() {
                           </div>
                           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">{patient.status}</span>
                         </div>
+
+                        {/* LOCAL DE ESTADIA / ACOLHIMENTO DA FAMÍLIA EM BELÉM */}
+                        {(patient.familyStayType !== 'Não informado' || patient.familyStayAddress) && (
+                          <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 flex items-start justify-between gap-2 text-xs">
+                            <div className="space-y-0.5">
+                              <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span>Estadia / Acolhimento da Família em Belém:</span>
+                              </span>
+                              <p className="text-zinc-100 font-semibold">{patient.familyStayType || 'Não informado'}</p>
+                              {patient.familyStayAddress && (
+                                <p className="text-[11px] text-zinc-300">📍 Endereço / Ref.: {patient.familyStayAddress}</p>
+                              )}
+                            </div>
+                            {stayMapsLink && (
+                              <a
+                                href={stayMapsLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-[10px] font-bold whitespace-nowrap flex items-center gap-1 shrink-0"
+                              >
+                                <MapPin className="w-3 h-3" /> Ver no Mapa
+                              </a>
+                            )}
+                          </div>
+                        )}
 
                         <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-start gap-2.5">
                           <Stethoscope className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
@@ -2127,6 +2187,62 @@ export default function App() {
                     <button type="button" onClick={() => handleToggleFieldDictation('cardiacDiagnosis')} className={`px-2.5 rounded-lg border ${activeFieldListening === 'cardiacDiagnosis' ? 'bg-rose-500 text-white border-rose-400 animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-300'}`}>
                       <Mic className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+                </div>
+
+                {/* SUB-BLOCO: ONDE A FAMÍLIA ESTÁ HOSPEDADA / ACOLHIDA EM BELÉM */}
+                <div className="pt-3 border-t border-zinc-800/90 space-y-2.5">
+                  <div>
+                    <label className="block text-amber-300 font-bold mb-1.5 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Onde os familiares estão permanecendo em Belém durante a internação? (Clique para selecionar)</span>
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {BELEN_STAY_OPTIONS.map((option) => {
+                        const isSelected = formData.familyStayType === option;
+                        return (
+                          <button
+                            type="button"
+                            key={option}
+                            onClick={() => setFormData({ ...formData, familyStayType: option })}
+                            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow'
+                                : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-amber-500/40'
+                            }`}
+                          >
+                            {isSelected ? '✓ ' : ''}{option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-zinc-400 mb-1">
+                      Endereço do Local em Belém / Nome da Casa de Apoio / Ponto de Referência
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={formData.familyStayAddress}
+                        onChange={(e) => setFormData({ ...formData, familyStayAddress: e.target.value })}
+                        placeholder="Ex: Casa de Apoio Bom Samaritano (Bairro Marco, Tv. Mauriti, nº 120) / Casa da tia Maria em Ananindeua..."
+                        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFieldDictation('familyStayAddress')}
+                        title="Ditar endereço por voz"
+                        className={`px-2.5 rounded-lg border ${
+                          activeFieldListening === 'familyStayAddress'
+                            ? 'bg-rose-500 text-white border-rose-400 animate-pulse'
+                            : 'bg-zinc-900 border-zinc-700 text-zinc-300'
+                        }`}
+                      >
+                        <Mic className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
