@@ -94,6 +94,25 @@ const EDUCATION_OPTIONS = [
   "Não informado"
 ];
 
+// Lista de Escolaridade da Criança / Paciente Pediátrico
+const CHILD_EDUCATION_OPTIONS = [
+  "Não se aplica (Bebê / Lactente)",
+  "Creche / Maternal",
+  "Educação Infantil (Pré-escola)",
+  "Alfabetização / 1º Ano",
+  "Ensino Fundamental I (1º ao 5º ano)",
+  "Ensino Fundamental II (6º ao 9º ano)",
+  "Ensino Médio",
+  "Educação Especial / AEE",
+  "Afastado(a) da escola devido ao tratamento",
+  "Fora da escola / Não alfabetizado(a)",
+  "Ensino Fundamental Incompleto",
+  "Ensino Fundamental Completo",
+  "Ensino Médio Incompleto",
+  "Ensino Médio Completo",
+  "Não informado"
+];
+
 // Lista oficial das principais religiões da população brasileira
 const RELIGION_OPTIONS = [
   "Católica",
@@ -323,6 +342,7 @@ const SEED_PATIENTS = [
     childName: "Arthur Gabriel Barreto Silva",
     childBirthDate: "2025-06-15",
     childAgeText: "1 ano e 4 meses",
+    childEducation: "Não se aplica (Bebê / Lactente)",
     naturalness: "Santarém - PA",
     originCity: "Santarém",
     originState: "PA",
@@ -491,6 +511,7 @@ function normalizePatientRecord(p) {
     childName: p.childName || p.name || 'Paciente Sem Nome',
     childBirthDate: birthDate,
     childAgeText: p.childAgeText || p.childAge || computedAge || '',
+    childEducation: p.childEducation || 'Não informado',
     naturalness: p.naturalness || '',
     originCity: p.originCity || '',
     originState: p.originState || 'PA',
@@ -712,6 +733,7 @@ export default function App() {
     childName: '',
     childBirthDate: '',
     childAgeText: '',
+    childEducation: 'Não informado',
     naturalness: '',
     originCity: '',
     originState: 'PA',
@@ -1195,6 +1217,7 @@ export default function App() {
       const matchSearch =
         (patient.childName || '').toLowerCase().includes(term) ||
         (patient.bed || '').toLowerCase().includes(term) ||
+        (patient.childEducation || '').toLowerCase().includes(term) ||
         (patient.originCity || '').toLowerCase().includes(term) ||
         (patient.familyStayType || '').toLowerCase().includes(term) ||
         (patient.familyStayAddress || '').toLowerCase().includes(term) ||
@@ -1298,6 +1321,7 @@ export default function App() {
         childName: norm.childName,
         childBirthDate: norm.childBirthDate || '',
         childAgeText: norm.childAgeText,
+        childEducation: norm.childEducation || 'Não informado',
         naturalness: norm.naturalness || '',
         originCity: norm.originCity,
         originState: norm.originState || 'PA',
@@ -1772,6 +1796,9 @@ export default function App() {
                         <div>
                           <h3 className="text-sm font-bold text-white truncate">{p.childName}</h3>
                           <p className="text-[11px] text-zinc-400">{p.childAgeText || 'Idade N/I'} {p.childBirthDate ? `• Nasc: ${formatDateBr(p.childBirthDate)}` : ''}</p>
+                          {p.childEducation && p.childEducation !== 'Não informado' && (
+                            <p className="text-[10px] text-zinc-300 truncate">🎓 {p.childEducation}</p>
+                          )}
                           <p className="text-[11px] text-zinc-400 truncate">📍 Origem: {p.originCity || 'N/I'}-{p.originState || 'PA'}</p>
                           {p.familyStayType && p.familyStayType !== 'Não informado' && (
                             <p className="text-[10px] text-amber-300 truncate" title={p.familyStayAddress ? `${p.familyStayType} — ${p.familyStayAddress}` : p.familyStayType}>
@@ -1868,7 +1895,7 @@ export default function App() {
                               <span className="text-xs text-zinc-400">({patient.childAgeText || 'Idade N/I'})</span>
                             </div>
                             <p className="text-xs text-zinc-400 mt-1">
-                              🎂 Nasc: <strong className="text-zinc-200">{formatDateBr(patient.childBirthDate)}</strong> • 📍 Naturalidade: <strong className="text-zinc-200">{patient.naturalness || 'N/I'}</strong> • Procedência: <strong className="text-zinc-200">{patient.originCity || 'N/I'} - {patient.originState || 'PA'}</strong>
+                              🎂 Nasc: <strong className="text-zinc-200">{formatDateBr(patient.childBirthDate)}</strong> • 🎓 Escolaridade: <strong className="text-zinc-200">{patient.childEducation || 'Não informado'}</strong> • 📍 Naturalidade: <strong className="text-zinc-200">{patient.naturalness || 'N/I'}</strong> • Procedência: <strong className="text-zinc-200">{patient.originCity || 'N/I'} - {patient.originState || 'PA'}</strong>
                             </p>
                           </div>
                           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">{patient.status}</span>
@@ -2180,13 +2207,27 @@ export default function App() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-zinc-400 mb-1">Diagnóstico Cardiológico / Cirurgia Realizada</label>
-                  <div className="flex gap-1.5">
-                    <input type="text" value={formData.cardiacDiagnosis} onChange={(e) => setFormData({ ...formData, cardiacDiagnosis: e.target.value })} placeholder="Ex: Tetralogia de Fallot / Pós-operatório de Jatene..." className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
-                    <button type="button" onClick={() => handleToggleFieldDictation('cardiacDiagnosis')} className={`px-2.5 rounded-lg border ${activeFieldListening === 'cardiacDiagnosis' ? 'bg-rose-500 text-white border-rose-400 animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-300'}`}>
-                      <Mic className="w-3.5 h-3.5" />
-                    </button>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Escolaridade da Criança / Paciente</label>
+                    <select
+                      value={formData.childEducation}
+                      onChange={(e) => setFormData({ ...formData, childEducation: e.target.value })}
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+                    >
+                      {CHILD_EDUCATION_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-zinc-400 mb-1">Diagnóstico Cardiológico / Cirurgia Realizada</label>
+                    <div className="flex gap-1.5">
+                      <input type="text" value={formData.cardiacDiagnosis} onChange={(e) => setFormData({ ...formData, cardiacDiagnosis: e.target.value })} placeholder="Ex: Tetralogia de Fallot / Pós-operatório de Jatene..." className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                      <button type="button" onClick={() => handleToggleFieldDictation('cardiacDiagnosis')} className={`px-2.5 rounded-lg border ${activeFieldListening === 'cardiacDiagnosis' ? 'bg-rose-500 text-white border-rose-400 animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-300'}`}>
+                        <Mic className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
