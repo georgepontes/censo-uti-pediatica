@@ -132,16 +132,45 @@ const RELIGION_OPTIONS = [
   "Não informado"
 ];
 
-// Opções clicáveis de onde a família está hospedada/acolhida em Belém durante a internação
+// Lista oficial de Raça / Cor / Etnia (IBGE + Povos Originários/Tradicionais)
+const RACE_OPTIONS = [
+  "Não informado",
+  "Parda",
+  "Preta",
+  "Branca",
+  "Indígena",
+  "Amarela",
+  "Quilombola / Povos Tradicionais"
+];
+
+// Opções clicáveis de onde a família está hospedada/acolhida em Belém ou Região Metropolitana durante a internação
 const BELEN_STAY_OPTIONS = [
-  "Residência Própria (Belém / Ananindeua / RMB)",
+  "Residência Própria (Belém ou Região Metropolitana)",
   "Casa de Apoio / Abrigo Institucional",
-  "Casa de Familiares em Belém",
-  "Casa de Amigos / Conhecidos",
-  "Hotel / Pensão / Pousada / Aluguel Temporário",
+  "Casa de Familiares (Belém ou Região Metropolitana)",
+  "Casa de Amigos / Conhecidos (Belém ou Região Metropolitana)",
+  "Hotel / Pensão / Pousada / Aluguel Temporário (Belém ou RMB)",
+  "Casa de Apoio / Hospedaria Municipal (TFD / Prefeitura)",
+  "Deslocamento Diário (Município Próximo / Interior)",
   "Permanência Integral no Hospital (Sem local externo)",
-  "Outro Local em Belém",
+  "Outro Local (Belém ou Região Metropolitana)",
   "Não informado"
+];
+
+// Sugestões rápidas de municípios de permanência (o campo continua 100% livre para digitar qualquer município)
+const STAY_MUNICIPALITY_SUGGESTIONS = [
+  "Belém",
+  "Ananindeua",
+  "Marituba",
+  "Benevides",
+  "Santa Bárbara do Pará",
+  "Santa Izabel do Pará",
+  "Castanhal",
+  "Barcarena",
+  "Abaetetuba",
+  "Icoaraci (Distrito - Belém)",
+  "Mosqueiro (Distrito - Belém)",
+  "Outeiro (Distrito - Belém)"
 ];
 
 // Lista de chaves de versões anteriores para resgate e migração automática
@@ -286,9 +315,12 @@ function getWhatsAppLink(phone) {
   return `https://wa.me/${fullNumber}`;
 }
 
-function getGoogleMapsLink(address) {
-  if (!address || !String(address).trim()) return null;
-  const query = encodeURIComponent(`${String(address).trim()}, Belém - PA`);
+function getGoogleMapsLink(address, stayCity) {
+  const cleanAddress = address ? String(address).trim() : '';
+  const cleanCity = stayCity ? String(stayCity).trim() : '';
+  if (!cleanAddress && !cleanCity) return null;
+  const locationContext = cleanCity ? `${cleanCity} - PA` : 'Belém - PA';
+  const query = encodeURIComponent(cleanAddress ? `${cleanAddress}, ${locationContext}` : locationContext);
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
 
@@ -342,12 +374,14 @@ const SEED_PATIENTS = [
     childName: "Arthur Gabriel Barreto Silva",
     childBirthDate: "2025-06-15",
     childAgeText: "1 ano e 4 meses",
+    childRace: "Parda",
     childEducation: "Não se aplica (Bebê / Lactente)",
     naturalness: "Santarém - PA",
     originCity: "Santarém",
     originState: "PA",
     familyStayType: "Casa de Apoio / Abrigo Institucional",
-    familyStayAddress: "Casa Ronald McDonald / Casa de Apoio no bairro São Brás, Belém - PA",
+    familyStayCity: "Belém",
+    familyStayAddress: "Casa Ronald McDonald / Casa de Apoio no bairro São Brás",
     cardiacDiagnosis: "Pós-operatório tardio de CIV ampla e Coarctação de Aorta",
     admissionDate: "2026-10-18",
     status: "Internado",
@@ -355,16 +389,22 @@ const SEED_PATIENTS = [
     companionName: "",
     companionKinship: "",
     companionAge: "",
+    companionRace: "Não informado",
+    companionNaturalness: "",
     companionPhone: "",
     companionEducation: "Não informado",
     companionReligion: "Não informado",
+    companionTraining: "",
     companionProfession: "",
     mother: {
       name: "Mariana Barreto Silva",
       age: 23,
+      race: "Parda",
+      naturalness: "Santarém - PA",
       phone: "(93) 98122-4411",
       education: "Ensino Médio Completo",
       religion: "Católica",
+      academicTraining: "Técnica em Enfermagem",
       profession: "Autônoma (Vendedora)",
       hasPsych: true,
       psychDetails: "Crises frequentes de ansiedade desde o diagnóstico intraútero. Insônia inicial e sentimento de desamparo por estar longe da rede de apoio em Santarém."
@@ -372,9 +412,12 @@ const SEED_PATIENTS = [
     father: {
       name: "Lucas Gabriel Silva",
       age: 26,
+      race: "Parda",
+      naturalness: "Alenquer - PA",
       phone: "(93) 98410-9920",
       education: "Ensino Médio Completo",
       religion: "Católica",
+      academicTraining: "Ensino Médio / Sem formação específica",
       profession: "Motorista de Entregas",
       hasPsych: false,
       psychDetails: "Permaneceu em Santarém trabalhando e cuidando do outro filho de 4 anos; relata preocupação financeira."
@@ -416,6 +459,10 @@ function normalizePatientRecord(p) {
   const mother = {
     name: p.mother?.name ?? p.motherName ?? (!isLegacyFather && !isLegacyOther ? flatCaregiverName : ''),
     age: p.mother?.age ?? p.motherAge ?? (!isLegacyFather && !isLegacyOther ? flatCaregiverAge : ''),
+    race: RACE_OPTIONS.includes(p.mother?.race || p.motherRace)
+      ? (p.mother?.race || p.motherRace)
+      : "Não informado",
+    naturalness: p.mother?.naturalness ?? p.motherNaturalness ?? '',
     phone: formatPhoneMask(p.mother?.phone ?? p.motherPhone ?? (!isLegacyFather && !isLegacyOther ? flatCaregiverPhone : '')),
     education: EDUCATION_OPTIONS.includes(p.mother?.education || p.motherEducation)
       ? (p.mother?.education || p.motherEducation)
@@ -423,6 +470,7 @@ function normalizePatientRecord(p) {
     religion: RELIGION_OPTIONS.includes(p.mother?.religion || p.motherReligion)
       ? (p.mother?.religion || p.motherReligion)
       : "Não informado",
+    academicTraining: p.mother?.academicTraining ?? p.motherTraining ?? '',
     profession: p.mother?.profession ?? p.motherProfession ?? '',
     hasPsych: Boolean(p.mother?.hasPsych ?? p.motherHasMentalHealth ?? p.motherPsychFlag ?? (!isLegacyFather ? flatCaregiverPsychFlag : false)),
     psychDetails: p.mother?.psychDetails ?? p.motherMentalHealthDetails ?? p.motherPsychDetails ?? (!isLegacyFather ? flatCaregiverPsychDetails : '')
@@ -431,6 +479,10 @@ function normalizePatientRecord(p) {
   const father = {
     name: p.father?.name ?? p.fatherName ?? (isLegacyFather ? flatCaregiverName : ''),
     age: p.father?.age ?? p.fatherAge ?? (isLegacyFather ? flatCaregiverAge : ''),
+    race: RACE_OPTIONS.includes(p.father?.race || p.fatherRace)
+      ? (p.father?.race || p.fatherRace)
+      : "Não informado",
+    naturalness: p.father?.naturalness ?? p.fatherNaturalness ?? '',
     phone: formatPhoneMask(p.father?.phone ?? p.fatherPhone ?? (isLegacyFather ? flatCaregiverPhone : '')),
     education: EDUCATION_OPTIONS.includes(p.father?.education || p.fatherEducation)
       ? (p.father?.education || p.fatherEducation)
@@ -438,6 +490,7 @@ function normalizePatientRecord(p) {
     religion: RELIGION_OPTIONS.includes(p.father?.religion || p.fatherReligion)
       ? (p.father?.religion || p.fatherReligion)
       : "Não informado",
+    academicTraining: p.father?.academicTraining ?? p.fatherTraining ?? '',
     profession: p.father?.profession ?? p.fatherProfession ?? '',
     hasPsych: Boolean(p.father?.hasPsych ?? p.fatherHasMentalHealth ?? p.fatherPsychFlag ?? (isLegacyFather ? flatCaregiverPsychFlag : false)),
     psychDetails: p.father?.psychDetails ?? p.fatherMentalHealthDetails ?? p.fatherPsychDetails ?? (isLegacyFather ? flatCaregiverPsychDetails : '')
@@ -511,11 +564,13 @@ function normalizePatientRecord(p) {
     childName: p.childName || p.name || 'Paciente Sem Nome',
     childBirthDate: birthDate,
     childAgeText: p.childAgeText || p.childAge || computedAge || '',
+    childRace: RACE_OPTIONS.includes(p.childRace) ? p.childRace : 'Não informado',
     childEducation: p.childEducation || 'Não informado',
     naturalness: p.naturalness || '',
     originCity: p.originCity || '',
     originState: p.originState || 'PA',
     familyStayType: p.familyStayType || 'Não informado',
+    familyStayCity: p.familyStayCity || '',
     familyStayAddress: p.familyStayAddress || '',
     cardiacDiagnosis: p.cardiacDiagnosis || '',
     admissionDate,
@@ -527,9 +582,12 @@ function normalizePatientRecord(p) {
     companionName: p.companionName || '',
     companionKinship: p.companionKinship || '',
     companionAge: p.companionAge ?? '',
+    companionRace: RACE_OPTIONS.includes(p.companionRace) ? p.companionRace : 'Não informado',
+    companionNaturalness: p.companionNaturalness || '',
     companionPhone: formatPhoneMask(p.companionPhone || ''),
     companionEducation: EDUCATION_OPTIONS.includes(p.companionEducation) ? p.companionEducation : 'Não informado',
     companionReligion: RELIGION_OPTIONS.includes(p.companionReligion) ? p.companionReligion : 'Não informado',
+    companionTraining: p.companionTraining || '',
     companionProfession: p.companionProfession || '',
     mother,
     father,
@@ -733,11 +791,13 @@ export default function App() {
     childName: '',
     childBirthDate: '',
     childAgeText: '',
+    childRace: 'Não informado',
     childEducation: 'Não informado',
     naturalness: '',
     originCity: '',
     originState: 'PA',
     familyStayType: 'Não informado',
+    familyStayCity: '',
     familyStayAddress: '',
     cardiacDiagnosis: '',
     admissionDate: currentBelemToday,
@@ -748,12 +808,15 @@ export default function App() {
     companionName: '',
     companionKinship: '',
     companionAge: '',
+    companionRace: 'Não informado',
+    companionNaturalness: '',
     companionPhone: '',
     companionEducation: 'Analfabeto',
     companionReligion: 'Não informado',
+    companionTraining: '',
     companionProfession: '',
-    mother: { name: '', age: '', phone: '', education: 'Ensino Médio Completo', religion: 'Católica', profession: '', hasPsych: false, psychDetails: '' },
-    father: { name: '', age: '', phone: '', education: 'Ensino Médio Completo', religion: 'Católica', profession: '', hasPsych: false, psychDetails: '' },
+    mother: { name: '', age: '', race: 'Não informado', naturalness: '', phone: '', education: 'Ensino Médio Completo', religion: 'Católica', academicTraining: '', profession: '', hasPsych: false, psychDetails: '' },
+    father: { name: '', age: '', race: 'Não informado', naturalness: '', phone: '', education: 'Ensino Médio Completo', religion: 'Católica', academicTraining: '', profession: '', hasPsych: false, psychDetails: '' },
     childMentalHealth: { hasCondition: false, details: '' },
     dailyEvolutions: [],
     psychNotes: ''
@@ -1217,12 +1280,22 @@ export default function App() {
       const matchSearch =
         (patient.childName || '').toLowerCase().includes(term) ||
         (patient.bed || '').toLowerCase().includes(term) ||
+        (patient.childRace || '').toLowerCase().includes(term) ||
         (patient.childEducation || '').toLowerCase().includes(term) ||
         (patient.originCity || '').toLowerCase().includes(term) ||
         (patient.familyStayType || '').toLowerCase().includes(term) ||
+        (patient.familyStayCity || '').toLowerCase().includes(term) ||
         (patient.familyStayAddress || '').toLowerCase().includes(term) ||
         (patient.mother?.name || '').toLowerCase().includes(term) ||
+        (patient.mother?.race || '').toLowerCase().includes(term) ||
+        (patient.mother?.naturalness || '').toLowerCase().includes(term) ||
+        (patient.mother?.academicTraining || '').toLowerCase().includes(term) ||
+        (patient.mother?.profession || '').toLowerCase().includes(term) ||
         (patient.father?.name || '').toLowerCase().includes(term) ||
+        (patient.father?.race || '').toLowerCase().includes(term) ||
+        (patient.father?.naturalness || '').toLowerCase().includes(term) ||
+        (patient.father?.academicTraining || '').toLowerCase().includes(term) ||
+        (patient.father?.profession || '').toLowerCase().includes(term) ||
         (patient.companionName || '').toLowerCase().includes(term) ||
         (patient.cardiacDiagnosis || '').toLowerCase().includes(term);
 
@@ -1321,11 +1394,13 @@ export default function App() {
         childName: norm.childName,
         childBirthDate: norm.childBirthDate || '',
         childAgeText: norm.childAgeText,
+        childRace: norm.childRace || 'Não informado',
         childEducation: norm.childEducation || 'Não informado',
         naturalness: norm.naturalness || '',
         originCity: norm.originCity,
         originState: norm.originState || 'PA',
         familyStayType: norm.familyStayType || 'Não informado',
+        familyStayCity: norm.familyStayCity || '',
         familyStayAddress: norm.familyStayAddress || '',
         cardiacDiagnosis: norm.cardiacDiagnosis,
         admissionDate: norm.admissionDate,
@@ -1336,9 +1411,12 @@ export default function App() {
         companionName: norm.companionName || '',
         companionKinship: norm.companionKinship || '',
         companionAge: norm.companionAge || '',
+        companionRace: norm.companionRace || 'Não informado',
+        companionNaturalness: norm.companionNaturalness || '',
         companionPhone: norm.companionPhone || '',
         companionEducation: norm.companionEducation || 'Não informado',
         companionReligion: norm.companionReligion || 'Não informado',
+        companionTraining: norm.companionTraining || '',
         companionProfession: norm.companionProfession || '',
         mother: { ...norm.mother },
         father: { ...norm.father },
@@ -1795,16 +1873,23 @@ export default function App() {
                       <div className="space-y-2 my-1">
                         <div>
                           <h3 className="text-sm font-bold text-white truncate">{p.childName}</h3>
-                          <p className="text-[11px] text-zinc-400">{p.childAgeText || 'Idade N/I'} {p.childBirthDate ? `• Nasc: ${formatDateBr(p.childBirthDate)}` : ''}</p>
+                          <p className="text-[11px] text-zinc-400">
+                            {p.childAgeText || 'Idade N/I'}
+                            {p.childRace && p.childRace !== 'Não informado' ? ` • ${p.childRace}` : ''}
+                            {p.childBirthDate ? ` • Nasc: ${formatDateBr(p.childBirthDate)}` : ''}
+                          </p>
                           {p.childEducation && p.childEducation !== 'Não informado' && (
                             <p className="text-[10px] text-zinc-300 truncate">🎓 {p.childEducation}</p>
                           )}
                           <p className="text-[11px] text-zinc-400 truncate">📍 Origem: {p.originCity || 'N/I'}-{p.originState || 'PA'}</p>
-                          {p.familyStayType && p.familyStayType !== 'Não informado' && (
-                            <p className="text-[10px] text-amber-300 truncate" title={p.familyStayAddress ? `${p.familyStayType} — ${p.familyStayAddress}` : p.familyStayType}>
-                              🏠 Em Belém: {p.familyStayType}
+                          {(p.familyStayType && p.familyStayType !== 'Não informado') || p.familyStayCity ? (
+                            <p
+                              className="text-[10px] text-amber-300 truncate"
+                              title={`${p.familyStayType || 'Local'}${p.familyStayCity ? ` (${p.familyStayCity})` : ''}${p.familyStayAddress ? ` — ${p.familyStayAddress}` : ''}`}
+                            >
+                              🏠 Permanência: {p.familyStayCity ? `${p.familyStayCity} • ` : ''}{p.familyStayType}
                             </p>
-                          )}
+                          ) : null}
                         </div>
 
                         <div className="p-2 rounded-xl bg-zinc-950/70 border border-zinc-800">
@@ -1882,7 +1967,7 @@ export default function App() {
                   const motherWa = getWhatsAppLink(patient.mother?.phone);
                   const fatherWa = getWhatsAppLink(patient.father?.phone);
                   const companionWa = getWhatsAppLink(patient.companionPhone);
-                  const stayMapsLink = getGoogleMapsLink(patient.familyStayAddress);
+                  const stayMapsLink = getGoogleMapsLink(patient.familyStayAddress, patient.familyStayCity);
 
                   return (
                     <div key={patient.id} className={`rounded-2xl border p-5 flex flex-col justify-between transition-all ${isDischarged ? 'bg-zinc-900/40 border-zinc-800 opacity-85' : isIso ? 'bg-purple-950/20 border-purple-500/40' : 'bg-zinc-900/80 border-zinc-800'}`}>
@@ -1893,6 +1978,11 @@ export default function App() {
                               <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30">{patient.bed}</span>
                               <h3 className="text-base font-bold text-white">{patient.childName}</h3>
                               <span className="text-xs text-zinc-400">({patient.childAgeText || 'Idade N/I'})</span>
+                              {patient.childRace && patient.childRace !== 'Não informado' && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-800 text-teal-300 border border-zinc-700 font-semibold">
+                                  Raça/Cor: {patient.childRace}
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs text-zinc-400 mt-1">
                               🎂 Nasc: <strong className="text-zinc-200">{formatDateBr(patient.childBirthDate)}</strong> • 🎓 Escolaridade: <strong className="text-zinc-200">{patient.childEducation || 'Não informado'}</strong> • 📍 Naturalidade: <strong className="text-zinc-200">{patient.naturalness || 'N/I'}</strong> • Procedência: <strong className="text-zinc-200">{patient.originCity || 'N/I'} - {patient.originState || 'PA'}</strong>
@@ -1901,15 +1991,18 @@ export default function App() {
                           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">{patient.status}</span>
                         </div>
 
-                        {/* LOCAL DE ESTADIA / ACOLHIMENTO DA FAMÍLIA EM BELÉM */}
-                        {(patient.familyStayType !== 'Não informado' || patient.familyStayAddress) && (
+                        {/* LOCAL DE ESTADIA / ACOLHIMENTO DA FAMÍLIA EM BELÉM OU REGIÃO METROPOLITANA */}
+                        {(patient.familyStayType !== 'Não informado' || patient.familyStayCity || patient.familyStayAddress) && (
                           <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 flex items-start justify-between gap-2 text-xs">
                             <div className="space-y-0.5">
                               <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
                                 <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                                <span>Estadia / Acolhimento da Família em Belém:</span>
+                                <span>Local de Permanência / Acolhimento Familiar Durante a Internação:</span>
                               </span>
-                              <p className="text-zinc-100 font-semibold">{patient.familyStayType || 'Não informado'}</p>
+                              <p className="text-zinc-100 font-semibold">
+                                {patient.familyStayType || 'Não informado'}
+                                {patient.familyStayCity ? ` — Município: ${patient.familyStayCity}` : ''}
+                              </p>
                               {patient.familyStayAddress && (
                                 <p className="text-[11px] text-zinc-300">📍 Endereço / Ref.: {patient.familyStayAddress}</p>
                               )}
@@ -1958,9 +2051,13 @@ export default function App() {
                               )}
                             </div>
                             <p className="text-zinc-200 font-medium">{patient.mother?.name || 'Não informado'} {patient.mother?.age ? `(${patient.mother.age} anos)` : ''}</p>
+                            <p className="text-[11px] text-zinc-400">
+                              🎨 Raça/Cor: <strong className="text-zinc-300">{patient.mother?.race || 'N/I'}</strong> • 📍 Nat.: <strong className="text-zinc-300">{patient.mother?.naturalness || 'N/I'}</strong>
+                            </p>
                             <p className="text-[11px] text-zinc-400">📞 {patient.mother?.phone || 'Sem telefone'}</p>
                             <p className="text-[11px] text-zinc-400">🎓 {patient.mother?.education || 'N/I'} • 🕊️ {patient.mother?.religion || 'N/I'}</p>
-                            <p className="text-[11px] text-zinc-400">💼 Profissão: {patient.mother?.profession || 'N/I'}</p>
+                            <p className="text-[11px] text-zinc-400">📚 Formação: <strong className="text-zinc-300">{patient.mother?.academicTraining || 'N/I'}</strong></p>
+                            <p className="text-[11px] text-zinc-400">💼 Profissão/Ocupação: <strong className="text-zinc-300">{patient.mother?.profession || 'N/I'}</strong></p>
                             {patient.mother?.hasPsych && (
                               <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded p-1.5 mt-1">
                                 🧠 <strong>Saúde Mental:</strong> {patient.mother.psychDetails || 'Em acompanhamento'}
@@ -1978,9 +2075,13 @@ export default function App() {
                               )}
                             </div>
                             <p className="text-zinc-200 font-medium">{patient.father?.name || 'Não informado'} {patient.father?.age ? `(${patient.father.age} anos)` : ''}</p>
+                            <p className="text-[11px] text-zinc-400">
+                              🎨 Raça/Cor: <strong className="text-zinc-300">{patient.father?.race || 'N/I'}</strong> • 📍 Nat.: <strong className="text-zinc-300">{patient.father?.naturalness || 'N/I'}</strong>
+                            </p>
                             <p className="text-[11px] text-zinc-400">📞 {patient.father?.phone || 'Sem telefone'}</p>
                             <p className="text-[11px] text-zinc-400">🎓 {patient.father?.education || 'N/I'} • 🕊️ {patient.father?.religion || 'N/I'}</p>
-                            <p className="text-[11px] text-zinc-400">💼 Profissão: {patient.father?.profession || 'N/I'}</p>
+                            <p className="text-[11px] text-zinc-400">📚 Formação: <strong className="text-zinc-300">{patient.father?.academicTraining || 'N/I'}</strong></p>
+                            <p className="text-[11px] text-zinc-400">💼 Profissão/Ocupação: <strong className="text-zinc-300">{patient.father?.profession || 'N/I'}</strong></p>
                             {patient.father?.hasPsych && (
                               <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded p-1.5 mt-1">
                                 🧠 <strong>Saúde Mental:</strong> {patient.father.psychDetails || 'Em acompanhamento'}
@@ -1995,7 +2096,13 @@ export default function App() {
                             <div>
                               <span className="text-amber-300 font-bold">👤 Outro Cuidador de Referência: </span>
                               <span className="text-zinc-200 font-medium">{patient.companionName} ({patient.companionKinship || 'Familiar'})</span>
-                              <span className="text-zinc-400"> • 🎓 {patient.companionEducation} • 🕊️ {patient.companionReligion} • 💼 {patient.companionProfession || 'N/I'}</span>
+                              <span className="text-zinc-400">
+                                {patient.companionRace && patient.companionRace !== 'Não informado' ? ` • Raça/Cor: ${patient.companionRace}` : ''}
+                                {patient.companionNaturalness ? ` • Nat.: ${patient.companionNaturalness}` : ''}
+                                {' '}• 🎓 {patient.companionEducation} • 🕊️ {patient.companionReligion}
+                                {patient.companionTraining ? ` • 📚 Formação: ${patient.companionTraining}` : ''}
+                                {' '}• 💼 Profissão: {patient.companionProfession || 'N/I'}
+                              </span>
                             </div>
                             {companionWa && (
                               <a href={companionWa} target="_blank" rel="noreferrer" className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
@@ -2195,48 +2302,50 @@ export default function App() {
                     <input type="text" value={formData.childAgeText} onChange={(e) => setFormData({ ...formData, childAgeText: e.target.value })} placeholder="Ex: 8 meses" className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
                   </div>
                   <div>
-                    <label className="block text-zinc-400 mb-1">Naturalidade</label>
-                    <input type="text" value={formData.naturalness} onChange={(e) => setFormData({ ...formData, naturalness: e.target.value })} placeholder="Ex: Belém - PA" className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Município de Procedência / UF</label>
-                    <div className="flex gap-1">
-                      <input type="text" value={formData.originCity} onChange={(e) => setFormData({ ...formData, originCity: e.target.value })} placeholder="Município" className="w-2/3 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
-                      <input type="text" maxLength={2} value={formData.originState} onChange={(e) => setFormData({ ...formData, originState: e.target.value.toUpperCase() })} placeholder="UF" className="w-1/3 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100 text-center" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Escolaridade da Criança / Paciente</label>
-                    <select
-                      value={formData.childEducation}
-                      onChange={(e) => setFormData({ ...formData, childEducation: e.target.value })}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-                    >
-                      {CHILD_EDUCATION_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
+                    <label className="block text-zinc-400 mb-1">Raça / Cor / Etnia da Criança</label>
+                    <select value={formData.childRace} onChange={(e) => setFormData({ ...formData, childRace: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
+                      {RACE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-zinc-400 mb-1">Diagnóstico Cardiológico / Cirurgia Realizada</label>
-                    <div className="flex gap-1.5">
-                      <input type="text" value={formData.cardiacDiagnosis} onChange={(e) => setFormData({ ...formData, cardiacDiagnosis: e.target.value })} placeholder="Ex: Tetralogia de Fallot / Pós-operatório de Jatene..." className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
-                      <button type="button" onClick={() => handleToggleFieldDictation('cardiacDiagnosis')} className={`px-2.5 rounded-lg border ${activeFieldListening === 'cardiacDiagnosis' ? 'bg-rose-500 text-white border-rose-400 animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-300'}`}>
-                        <Mic className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Escolaridade da Criança</label>
+                    <select value={formData.childEducation} onChange={(e) => setFormData({ ...formData, childEducation: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
+                      {CHILD_EDUCATION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
                   </div>
                 </div>
 
-                {/* SUB-BLOCO: ONDE A FAMÍLIA ESTÁ HOSPEDADA / ACOLHIDA EM BELÉM */}
-                <div className="pt-3 border-t border-zinc-800/90 space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-zinc-400 mb-1">Naturalidade da Criança (Município / UF)</label>
+                    <input type="text" value={formData.naturalness} onChange={(e) => setFormData({ ...formData, naturalness: e.target.value })} placeholder="Ex: Belém - PA, Breves - PA..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Município de Procedência (Moradia)</label>
+                    <input type="text" value={formData.originCity} onChange={(e) => setFormData({ ...formData, originCity: e.target.value })} placeholder="Ex: Santarém, Abaetetuba..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">UF</label>
+                    <input type="text" maxLength={2} value={formData.originState} onChange={(e) => setFormData({ ...formData, originState: e.target.value.toUpperCase() })} placeholder="PA" className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 mb-1">Diagnóstico Cardiológico / Cirurgia Realizada ou Proposta</label>
+                  <div className="flex gap-1.5">
+                    <input type="text" value={formData.cardiacDiagnosis} onChange={(e) => setFormData({ ...formData, cardiacDiagnosis: e.target.value })} placeholder="Ex: Tetralogia de Fallot, Pós-op de CIV, TGA..." className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                    <button type="button" onClick={() => handleToggleFieldDictation('cardiacDiagnosis')} className={`px-2.5 rounded-lg border ${activeFieldListening === 'cardiacDiagnosis' ? 'bg-rose-500 text-white border-rose-400 animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-300'}`}>
+                      <Mic className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* SUB-BLOCO: ONDE A FAMÍLIA ESTÁ HOSPEDADA / ACOLHIDA EM BELÉM OU REGIÃO METROPOLITANA */}
+                <div className="pt-3 border-t border-zinc-800/90 space-y-3">
                   <div>
                     <label className="block text-amber-300 font-bold mb-1.5 flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Onde os familiares estão permanecendo em Belém durante a internação? (Clique para selecionar)</span>
+                      <span>Onde os familiares estão permanecendo em Belém ou Região Metropolitana durante a internação? (Clique para selecionar)</span>
                     </label>
                     <div className="flex flex-wrap gap-1.5">
                       {BELEN_STAY_OPTIONS.map((option) => {
@@ -2259,30 +2368,65 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-zinc-400 mb-1">
-                      Endereço do Local em Belém / Nome da Casa de Apoio / Ponto de Referência
-                    </label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={formData.familyStayAddress}
-                        onChange={(e) => setFormData({ ...formData, familyStayAddress: e.target.value })}
-                        placeholder="Ex: Casa de Apoio Bom Samaritano (Bairro Marco, Tv. Mauriti, nº 120) / Casa da tia Maria em Ananindeua..."
-                        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleToggleFieldDictation('familyStayAddress')}
-                        title="Ditar endereço por voz"
-                        className={`px-2.5 rounded-lg border ${
-                          activeFieldListening === 'familyStayAddress'
-                            ? 'bg-rose-500 text-white border-rose-400 animate-pulse'
-                            : 'bg-zinc-900 border-zinc-700 text-zinc-300'
-                        }`}
-                      >
-                        <Mic className="w-3.5 h-3.5" />
-                      </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-zinc-400 mb-1">
+                        Município Exato de Permanência (Belém, RMB ou Outro)
+                      </label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          list="stay-municipality-list"
+                          value={formData.familyStayCity}
+                          onChange={(e) => setFormData({ ...formData, familyStayCity: e.target.value })}
+                          placeholder="Ex: Belém, Ananindeua, Marituba..."
+                          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+                        />
+                        <datalist id="stay-municipality-list">
+                          {STAY_MUNICIPALITY_SUGGESTIONS.map((city) => (
+                            <option key={city} value={city} />
+                          ))}
+                        </datalist>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFieldDictation('familyStayCity')}
+                          title="Ditar município de permanência por voz"
+                          className={`px-2.5 rounded-lg border ${
+                            activeFieldListening === 'familyStayCity'
+                              ? 'bg-rose-500 text-white border-rose-400 animate-pulse'
+                              : 'bg-zinc-900 border-zinc-700 text-zinc-300'
+                          }`}
+                        >
+                          <Mic className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-zinc-400 mb-1">
+                        Endereço do Local / Nome da Casa de Apoio / Bairro ou Ponto de Referência
+                      </label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={formData.familyStayAddress}
+                          onChange={(e) => setFormData({ ...formData, familyStayAddress: e.target.value })}
+                          placeholder="Ex: Casa de Apoio Bom Samaritano (Bairro Marco) / Casa da tia Maria na Cidade Nova..."
+                          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFieldDictation('familyStayAddress')}
+                          title="Ditar endereço por voz"
+                          className={`px-2.5 rounded-lg border ${
+                            activeFieldListening === 'familyStayAddress'
+                              ? 'bg-rose-500 text-white border-rose-400 animate-pulse'
+                              : 'bg-zinc-900 border-zinc-700 text-zinc-300'
+                          }`}
+                        >
+                          <Mic className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2306,7 +2450,17 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Raça / Cor / Etnia da Mãe</label>
+                    <select value={formData.mother.race} onChange={(e) => setFormData({ ...formData, mother: { ...formData.mother, race: e.target.value } })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
+                      {RACE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Naturalidade da Mãe (Município/UF)</label>
+                    <input type="text" value={formData.mother.naturalness} onChange={(e) => setFormData({ ...formData, mother: { ...formData.mother, naturalness: e.target.value } })} placeholder="Ex: Belém - PA, Cametá - PA..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
                   <div>
                     <label className="block text-zinc-400 mb-1">Escolaridade da Mãe</label>
                     <select value={formData.mother.education} onChange={(e) => setFormData({ ...formData, mother: { ...formData.mother, education: e.target.value } })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
@@ -2319,9 +2473,16 @@ export default function App() {
                       {RELIGION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-400 mb-1">Profissão / Ocupação da Mãe</label>
-                    <input type="text" value={formData.mother.profession} onChange={(e) => setFormData({ ...formData, mother: { ...formData.mother, profession: e.target.value } })} placeholder="Ex: Do lar, Agricultora, Professora..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                    <label className="block text-zinc-400 mb-1">Formação (Acadêmica / Técnica / Curso da Mãe)</label>
+                    <input type="text" value={formData.mother.academicTraining} onChange={(e) => setFormData({ ...formData, mother: { ...formData.mother, academicTraining: e.target.value } })} placeholder="Ex: Pedagogia, Técnica em Enfermagem, Sem formação específica..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Profissão / Ocupação Atual da Mãe</label>
+                    <input type="text" value={formData.mother.profession} onChange={(e) => setFormData({ ...formData, mother: { ...formData.mother, profession: e.target.value } })} placeholder="Ex: Do lar, Autônoma, Vendedora, Agricultora..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
                   </div>
                 </div>
 
@@ -2357,7 +2518,17 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Raça / Cor / Etnia do Pai</label>
+                    <select value={formData.father.race} onChange={(e) => setFormData({ ...formData, father: { ...formData.father, race: e.target.value } })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
+                      {RACE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Naturalidade do Pai (Município/UF)</label>
+                    <input type="text" value={formData.father.naturalness} onChange={(e) => setFormData({ ...formData, father: { ...formData.father, naturalness: e.target.value } })} placeholder="Ex: Belém - PA, Castanhal - PA..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
                   <div>
                     <label className="block text-zinc-400 mb-1">Escolaridade do Pai</label>
                     <select value={formData.father.education} onChange={(e) => setFormData({ ...formData, father: { ...formData.father, education: e.target.value } })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
@@ -2370,9 +2541,16 @@ export default function App() {
                       {RELIGION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-400 mb-1">Profissão / Ocupação do Pai</label>
-                    <input type="text" value={formData.father.profession} onChange={(e) => setFormData({ ...formData, father: { ...formData.father, profession: e.target.value } })} placeholder="Ex: Autônomo, Pescador, Motorista..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                    <label className="block text-zinc-400 mb-1">Formação (Acadêmica / Técnica / Curso do Pai)</label>
+                    <input type="text" value={formData.father.academicTraining} onChange={(e) => setFormData({ ...formData, father: { ...formData.father, academicTraining: e.target.value } })} placeholder="Ex: Administração, Eletricista, Sem formação específica..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Profissão / Ocupação Atual do Pai</label>
+                    <input type="text" value={formData.father.profession} onChange={(e) => setFormData({ ...formData, father: { ...formData.father, profession: e.target.value } })} placeholder="Ex: Motorista de aplicativo, Pescador, Autônomo..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
                   </div>
                 </div>
 
@@ -2464,7 +2642,17 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Raça / Cor / Etnia</label>
+                    <select value={formData.companionRace} onChange={(e) => setFormData({ ...formData, companionRace: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
+                      {RACE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Naturalidade (Município/UF)</label>
+                    <input type="text" value={formData.companionNaturalness} onChange={(e) => setFormData({ ...formData, companionNaturalness: e.target.value })} placeholder="Ex: Belém - PA..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
                   <div>
                     <label className="block text-zinc-400 mb-1">Escolaridade</label>
                     <select value={formData.companionEducation} onChange={(e) => setFormData({ ...formData, companionEducation: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100">
@@ -2477,9 +2665,16 @@ export default function App() {
                       {RELIGION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-400 mb-1">Profissão / Ocupação</label>
-                    <input type="text" value={formData.companionProfession} onChange={(e) => setFormData({ ...formData, companionProfession: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                    <label className="block text-zinc-400 mb-1">Formação (Acadêmica / Técnica)</label>
+                    <input type="text" value={formData.companionTraining} onChange={(e) => setFormData({ ...formData, companionTraining: e.target.value })} placeholder="Ex: Magistério, Técnico, Sem formação específica..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Profissão / Ocupação Atual</label>
+                    <input type="text" value={formData.companionProfession} onChange={(e) => setFormData({ ...formData, companionProfession: e.target.value })} placeholder="Ex: Aposentada, Do lar, Comerciante..." className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100" />
                   </div>
                 </div>
               </div>
